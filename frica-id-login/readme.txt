@@ -4,7 +4,7 @@ Tags: login, single sign on, openid connect, oauth, frica
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.0.4
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -34,7 +34,7 @@ The plugin does not expose Frica's internal account reference in the user interf
 
 This plugin connects to Frica ID, an external authentication service operated at https://frica.id. An administrator must register a developer application at https://frica.id/dashboard/developer.
 
-Only when a visitor starts sign-in or connects their account, their browser is redirected to https://api.frica.id/oauth/authorize and Frica's login/consent screens. The site exchanges the returned authorization code at https://api.frica.id/oauth/token and requests the user's name and verified email at https://api.frica.id/oauth/userinfo. Public signing keys are retrieved from https://api.frica.id/.well-known/jwks.json and cached for one hour. Unneeded refresh tokens are sent to https://api.frica.id/oauth/revoke for revocation. WordPress HTTP requests naturally send the site's server IP to Frica; browser sign-in sends the visitor's IP and browser details to Frica.
+Only when a visitor starts sign-in or connects their account, their browser is redirected to https://api.frica.id/oauth/authorize and Frica's login/consent screens. The site exchanges the returned authorization code at https://api.frica.id/oauth/token and requests the user's name, Public Frica ID and verified email at https://api.frica.id/oauth/userinfo. Public signing keys are retrieved from https://api.frica.id/.well-known/jwks.json and cached for one hour. Unneeded refresh tokens are sent to https://api.frica.id/oauth/revoke for revocation. WordPress HTTP requests naturally send the site's server IP to Frica; browser sign-in sends the visitor's IP and browser details to Frica.
 
 Requested scopes: openid profile email. No analytics, tracking pixels, remote fonts or external JavaScript are included. WordPress authentication cookies remain governed by WordPress.
 
@@ -56,6 +56,9 @@ A secure browser cookie and server-side login transaction expire after ten minut
 9. Exclude wp-login.php and wp-admin/admin-post.php from caching. Reverse proxies must correctly report HTTPS to WordPress. Exclude callback query strings from access logs and analytics.
 
 == Frequently Asked Questions ==
+
+= Which WordPress username will members receive? =
+New accounts use their Public Frica ID, such as FID-7K9MX4QP2N8C. A local collision adds a suffix such as -2; usernames never determine account linking. Missing or invalid Public IDs use a private generated fallback. On single sites, legacy frica_ usernames followed by 24 hexadecimal characters switch on the next verified Frica sign-in. Custom usernames and shared Multisite usernames stay unchanged. Migration preserves account data and author URLs, invalidates old sessions and creates a fresh session for that sign-in.
 
 = How do I diagnose a verification failure? =
 
@@ -96,6 +99,9 @@ State must be used once, within ten minutes, in the same browser. Secure cookies
 
 == Changelog ==
 
+= 1.1.0 =
+* Use Public Frica ID usernames and nicknames, safely upgrade legacy generated usernames after verified sign-in, and handle collisions without merging accounts.
+
 = 1.0.4 =
 * Identify fixed token-verification reasons and missing OpenSSL dependencies without recording tokens, claims or arbitrary exception messages.
 
@@ -116,6 +122,9 @@ State must be used once, within ten minutes, in the same browser. Secure cookies
 * Initial release with OpenID Connect, PKCE, explicit linking, optional Subscriber registration and a login shortcode.
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+Generated usernames on single sites switch to the Public Frica ID on the next verified sign-in. Custom usernames and account data are preserved. Old sessions are retired when a username changes.
 
 = 1.0.4 =
 Adds safe administrator-only verification reasons. Retry sign-in and match the reference in Settings > Frica ID.

@@ -72,6 +72,7 @@ check(($result['headers']['location'][0] ?? '') === home_url('/members/'), 'comp
 $id = Store::linked_user($sub); $user = get_userdata($id);
 check($user instanceof WP_User && $user->roles === ['subscriber'], 'new account gets Subscriber role only');
 check(strpos($user->user_login, $sub) === false && $user->display_name === 'Frica Member', 'internal subject never displayed as username or name');
+check($user->user_login === 'FID-7K9MX4QP2N8C' && $user->nickname === $user->user_login, 'new WordPress username and nickname use Public Frica ID');
 check(get_option('frica_suite_revoked') === 'refresh-new-user', 'unneeded refresh token revoked');
 $auth = [];
 foreach ($result['headers']['set-cookie'] ?? [] as $cookie) {
@@ -132,6 +133,44 @@ $GLOBALS['frica_response_mode'] = 201;
 try { OIDC::request('/oauth/userinfo'); throw new RuntimeException('unexpected_success'); }
 catch (RuntimeException $error) { check($error->getMessage() === 'invalid_response', '201 tolerance is limited to token endpoint'); }
 remove_filter('pre_http_request', $transport, 20);
+
+// Each feature group gets a fresh test rate-limit window; all test browsers share loopback.
+delete_transient('frica_id_rate_' . hash_hmac('sha256', '127.0.0.1', wp_salt('nonce')));
+
+// Public IDs select a friendly local username; only the issuer-bound subject authorizes account access.
+$collision_owner = wp_insert_user(['user_login' => 'FID-23456789ABCD', 'user_pass' => wp_generate_password(), 'user_email' => 'collision-owner@example.test', 'role' => 'subscriber']);
+[$start, $q] = begin(); spec($q, 'public-id-collision', 'collision-subject', 'collision-member@example.test', ['profile' => ['public_id' => 'FID-23456789ABCD']]);
+finish($start, $q, 'public-id-collision');
+$collision_user = get_userdata(Store::linked_user('collision-subject'));
+check($collision_user->user_login === 'FID-23456789ABCD-2' && $collision_user->ID !== $collision_owner, 'public ID collision adds suffix without attaching to another account');
+foreach (['missing' => null, 'invalid' => '../../administrator'] as $kind => $public_id) {
+    [$start, $q] = begin(); spec($q, 'public-id-' . $kind, 'fallback-' . $kind, 'fallback-' . $kind . '@example.test', ['profile' => ['public_id' => $public_id]]);
+    finish($start, $q, 'public-id-' . $kind);
+    $fallback = get_userdata(Store::linked_user('fallback-' . $kind));
+    check(preg_match('/^frica_[a-f0-9]{24}$/D', $fallback->user_login) === 1, 'safe private fallback for ' . $kind . ' public ID');
+}
+$legacy_login = 'frica_' . str_repeat('a', 24);
+$legacy_id = wp_insert_user(['user_login' => $legacy_login, 'user_pass' => 'LegacyTestPassword!456', 'user_email' => 'legacy@example.test', 'display_name' => 'Existing display name', 'role' => 'subscriber']);
+Store::link($legacy_id, 'legacy-subject');
+$legacy_before = get_userdata($legacy_id);
+$legacy_password = $legacy_before->user_pass; $legacy_slug = $legacy_before->user_nicename;
+$legacy_sessions = WP_Session_Tokens::get_instance($legacy_id); $old_token = $legacy_sessions->create(time() + 3600);
+$post_id = wp_insert_post(['post_title' => 'Keep my content', 'post_author' => $legacy_id, 'post_status' => 'publish']);
+[$start, $q] = begin(); spec($q, 'migrate-username', 'legacy-subject', 'legacy@example.test', ['profile' => ['public_id' => 'FID-9K9MX4QP2N8C']]);
+$migrated_response = finish($start, $q, 'migrate-username');
+clean_user_cache($legacy_id); $migrated = get_userdata($legacy_id);
+check($migrated->user_login === 'FID-9K9MX4QP2N8C' && !username_exists($legacy_login), 'legacy generated username migrates on verified Frica sign-in and clears lookup cache');
+check($migrated->user_pass === $legacy_password && $migrated->roles === ['subscriber'] && $migrated->display_name === 'Existing display name', 'username migration preserves password, permissions and display name');
+check($migrated->user_nicename === $legacy_slug && (int) get_post($post_id)->post_author === $legacy_id && Store::linked_user('legacy-subject') === $legacy_id, 'username migration preserves author URLs, content ownership and Frica account link');
+check(!WP_Session_Tokens::get_instance($legacy_id)->verify($old_token), 'username migration retires old sessions');
+$migrated_cookies = [];
+foreach ($migrated_response['headers']['set-cookie'] ?? [] as $cookie) { $value = explode(';', $cookie)[0]; if (strpos($value, 'wordpress_') === 0) { $migrated_cookies[] = $value; } }
+check((json_decode(http('/whoami', $migrated_cookies)['body'], true)['user'] ?? 0) === $legacy_id, 'renamed user receives a working new WordPress session');
+$custom_id = wp_insert_user(['user_login' => 'my_custom_username', 'user_pass' => wp_generate_password(), 'user_email' => 'custom@example.test']);
+Store::link($custom_id, 'custom-subject');
+[$start, $q] = begin(); spec($q, 'keep-custom-username', 'custom-subject', 'custom@example.test'); finish($start, $q, 'keep-custom-username');
+clean_user_cache($custom_id);
+check(get_userdata($custom_id)->user_login === 'my_custom_username', 'custom usernames are preserved');
 
 // Model independent issuer/WordPress clocks; real provider responses need not share PHP's clock.
 $private_key = file_get_contents(dirname(rtrim(getenv('WP_ROOT'), '/')) . '/test-signing.pem');

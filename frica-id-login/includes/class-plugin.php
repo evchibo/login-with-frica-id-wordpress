@@ -41,7 +41,7 @@ final class Plugin {
         add_action('admin_init', static function () {
             if (function_exists('wp_add_privacy_policy_content')) {
                 wp_add_privacy_policy_content('Login with Frica ID', wp_kses_post(
-                    '<p>' . __('When you choose Login with Frica ID, this site redirects you to Frica ID for authentication and requests your name and verified email address. A private hash of your Frica account reference is stored to recognize your linked WordPress account. Authentication tokens are not saved. A secure temporary cookie and a login transaction are kept for up to ten minutes; expired transaction records are deleted by scheduled cleanup or the next login attempt. Your WordPress profile and connection remain until disconnected or deleted. See https://frica.id/legal/privacy for Frica’s privacy policy.', 'frica-id-login') . '</p>'
+                    '<p>' . __('When you choose Login with Frica ID, this site redirects you to Frica ID for authentication and requests your name, Public Frica ID and verified email address. New accounts use the Public Frica ID as their WordPress username when available. A private hash of your Frica account reference is stored to recognize your linked WordPress account. Authentication tokens are not saved. A secure temporary cookie and a login transaction are kept for up to ten minutes; expired transaction records are deleted by scheduled cleanup or the next login attempt. Your WordPress profile and connection remain until disconnected or deleted. See https://frica.id/legal/privacy for Frica’s privacy policy.', 'frica-id-login') . '</p>'
                 ));
             }
         });
@@ -264,6 +264,50 @@ final class Plugin {
         }
     }
 
+    private static function public_username(array $profile): string {
+        $public_id = $profile['public_id'] ?? '';
+        return is_string($public_id) && preg_match('/^FID-[23456789ABCDEFGHJKMNPQRSTVWXYZ]{12}$/D', $public_id) === 1 ? $public_id : '';
+    }
+
+    private static function available_username(string $base, int $owner = 0): string {
+        $blocked = array_map('strtolower', (array) apply_filters('illegal_user_logins', [])); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Honor the WordPress core username policy.
+        for ($suffix = 0; $suffix < 100; $suffix++) {
+            $login = $base . ($suffix ? '-' . ($suffix + 1) : '');
+            $existing = username_exists($login);
+            if ((!$existing || (int) $existing === $owner) && validate_username($login) && !in_array(strtolower($login), $blocked, true)) { return $login; }
+        }
+        return '';
+    }
+
+    private function upgrade_generated_username(\WP_User $user, array $profile): \WP_User {
+        global $wpdb;
+        $base = self::public_username($profile);
+        // Only legacy plugin-format usernames on single sites migrate after verified Frica authentication.
+        // Explicitly linked accounts with custom usernames and shared Multisite usernames stay unchanged.
+        if (!$base || is_multisite() || preg_match('/^frica_[a-f0-9]{24}$/D', $user->user_login) !== 1) { return $user; }
+        $lock = 'frica_id_signup_' . substr(hash('sha256', $wpdb->prefix), 0, 40);
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Serialize username selection with plugin registrations using a connection-scoped advisory lock.
+        if ((int) $wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s, 5)', $lock)) !== 1) { return $user; }
+        try {
+            $login = self::available_username($base, $user->ID);
+            if (!$login) { return $user; }
+            $old_login = $user->user_login;
+            $old_data = clone $user->data;
+            // Core wp_update_user deliberately preserves user_login. Update only the verified account and expected old login, then invalidate core caches and sessions.
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- WordPress has no username-change API; the conditional write is followed by clean_user_cache.
+            $updated = $wpdb->update($wpdb->users, ['user_login' => $login], ['ID' => $user->ID, 'user_login' => $old_login], ['%s'], ['%d', '%s']);
+            if ($updated !== 1) { return get_userdata($user->ID) ?: $user; }
+            clean_user_cache($user);
+            \WP_Session_Tokens::get_instance($user->ID)->destroy_all();
+            if (get_user_meta($user->ID, 'nickname', true) === $old_login) { update_user_meta($user->ID, 'nickname', $login); }
+            // Preserve display names, author URLs, passwords, roles, content and the subject-based link.
+            do_action('profile_update', $user->ID, $old_data, ['ID' => $user->ID, 'user_login' => $login]); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Notify standard WordPress profile observers.
+            return get_userdata($user->ID);
+        } finally {
+            $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)', $lock)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Release the connection-scoped advisory lock.
+        }
+    }
+
     public function resolve_user(array $profile, int $link_user = 0): \WP_User {
         global $wpdb;
         $existing = Store::linked_user($profile['sub']);
@@ -277,7 +321,7 @@ final class Plugin {
         if ($existing) {
             $user = get_userdata($existing);
             if (!$user || $user->spam || $user->deleted || (is_multisite() && !is_user_member_of_blog($user->ID))) { throw new \RuntimeException('login_blocked'); }
-            return $user;
+            return $this->upgrade_generated_username($user, $profile);
         }
         // Matching email alone is never authority to attach to an existing account.
         if (email_exists($profile['email'])) { throw new \RuntimeException('email_exists'); }
@@ -292,8 +336,11 @@ final class Plugin {
             if (email_exists($profile['email'])) { throw new \RuntimeException('email_exists'); }
             $name = isset($profile['name']) && is_string($profile['name']) ? sanitize_text_field($profile['name']) : '';
             if ($name === '' || $name === $profile['sub']) { $name = __('Frica member', 'frica-id-login'); }
+            $base = self::public_username($profile);
+            $login = self::available_username($base ?: 'frica_' . bin2hex(random_bytes(12)));
+            if (!$login) { throw new \RuntimeException('registration_failed'); }
             $id = wp_insert_user([
-                'user_login' => 'frica_' . bin2hex(random_bytes(12)), 'user_pass' => wp_generate_password(64, true, true),
+                'user_login' => $login, 'nickname' => $login, 'user_pass' => wp_generate_password(64, true, true),
                 'user_email' => $profile['email'], 'display_name' => wp_html_excerpt($name, 250, ''), 'role' => 'subscriber',
                 'first_name' => sanitize_text_field(is_string($profile['given_name'] ?? null) ? $profile['given_name'] : ''),
                 'last_name' => sanitize_text_field(is_string($profile['family_name'] ?? null) ? $profile['family_name'] : ''),

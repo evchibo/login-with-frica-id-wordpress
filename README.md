@@ -29,7 +29,7 @@ Compatibility checks run against WordPress 6.6 / PHP 8.0 and WordPress 7.1.3 / P
 
 ## Install
 
-1. Download **`frica-id-login-1.0.4.zip`** from [GitHub Releases](https://github.com/evchibo/login-with-frica-id-wordpress/releases/latest). Choose the plugin ZIP under **Assets**, rather than GitHub's generated source archive.
+1. Download **`frica-id-login-1.1.0.zip`** from [GitHub Releases](https://github.com/evchibo/login-with-frica-id-wordpress/releases/latest). Choose the plugin ZIP under **Assets**, rather than GitHub's generated source archive.
 2. In WordPress, open **Plugins → Add New → Upload Plugin**.
 3. Upload the ZIP, install it, and activate **Login with Frica ID**.
 4. Open **Settings → Frica ID** and follow the setup steps below.
@@ -71,7 +71,9 @@ A signed-in visitor sees a link to manage their Frica ID connection.
 
 ## Privacy and account security
 
-The plugin requests your name and verified email through [Frica ID](https://frica.id), using `openid profile email`. It does not request KYC, wallet, payment or phone information. A private one-way account-reference hash recognizes the connection; Frica's internal user identifier is not displayed as a member's username or name.
+The plugin requests your name, Public Frica ID and verified email through [Frica ID](https://frica.id), using `openid profile email`. It does not request KYC, wallet, payment or phone information. A private one-way account-reference hash recognizes the connection; Frica's internal user identifier is not displayed as a member's username or name.
+
+New WordPress accounts use the Public Frica ID (for example `FID-7K9MX4QP2N8C`) as their username and nickname. If that name is already in use locally, a suffix such as `-2` is added; accounts are never linked by username. A missing or invalid Public ID uses a private generated fallback. On single sites, existing `frica_` usernames followed by 24 hexadecimal characters switch to the Public ID on their next successful Frica authentication. Custom usernames and shared Multisite usernames remain unchanged. Migration preserves account identity, passwords, permissions, content, display names and author URLs. Old sessions are invalidated and the successful sign-in creates a fresh session.
 
 Login state expires after ten minutes and can be consumed only once. The flow uses a Secure, HttpOnly, SameSite=Lax cookie, PKCE S256, nonce binding, RS256 signatures, issuer/audience checks and matching UserInfo subjects. Access and refresh tokens are not retained; unnecessary refresh tokens are revoked on a best-effort basis.
 

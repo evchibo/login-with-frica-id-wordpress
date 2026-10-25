@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+- Use Public Frica IDs for new WordPress usernames and nicknames.
+- Migrate legacy generated usernames after verified sign-in, preserving account data and author URLs.
+- Handle local username collisions without linking or merging accounts.
+
 ## 1.0.4
 
 - Add safe verification reason categories and OpenSSL dependency checks.

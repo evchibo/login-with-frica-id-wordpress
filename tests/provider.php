@@ -28,7 +28,7 @@ function frica_test_provider($preempt, $args, $url) {
     } elseif ($path === '/oauth/userinfo') {
         $code = substr($args['headers']['Authorization'] ?? '', 7);
         $spec = get_option('frica_suite_' . $code, []);
-        $data = array_merge(['sub' => $spec['sub'], 'email' => $spec['email'], 'email_verified' => true, 'name' => 'Frica Member'], $spec['profile'] ?? []);
+        $data = array_merge(['sub' => $spec['sub'], 'email' => $spec['email'], 'email_verified' => true, 'name' => 'Frica Member', 'public_id' => 'FID-7K9MX4QP2N8C'], $spec['profile'] ?? []);
     } elseif ($path === '/oauth/revoke') {
         update_option('frica_suite_revoked', $args['body']['token']);
     } else { throw new RuntimeException('Unexpected provider endpoint'); }

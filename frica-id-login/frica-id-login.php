@@ -3,7 +3,7 @@
  * Plugin Name: Login with Frica ID
  * Plugin URI: https://github.com/evchibo/login-with-frica-id-wordpress
  * Description: Secure Frica ID sign-in and account linking with OpenID Connect and PKCE.
- * Version: 1.0.4
+ * Version: 1.1.0
  * Requires at least: 6.6
  * Requires PHP: 8.0
  * Author: Frica
@@ -15,7 +15,7 @@
 
 if (!defined('ABSPATH')) { exit; }
 
-define('FRICA_ID_LOGIN_VERSION', '1.0.4');
+define('FRICA_ID_LOGIN_VERSION', '1.1.0');
 define('FRICA_ID_LOGIN_FILE', __FILE__);
 
 // A private namespace prevents conflicts with JWT libraries in other plugins.

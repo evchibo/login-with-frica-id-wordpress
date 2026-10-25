@@ -1,19 +1,19 @@
-# Login with Frica ID for WordPress — v1.0.4
+# Login with Frica ID for WordPress — v1.1.0
 
 Add secure **[Frica ID](https://frica.id)** sign-in to your WordPress website.
 
 ## Download and install
 
-Download **`frica-id-login-1.0.4.zip`** from the release assets. In WordPress, open **Plugins → Add New → Upload Plugin**, install the ZIP, and activate it. GitHub's automatically generated source archives are development source, not the packaged plugin.
+Download **`frica-id-login-1.1.0.zip`** from the release assets. In WordPress, open **Plugins → Add New → Upload Plugin**, install the ZIP, and activate it. GitHub's automatically generated source archives are development source, not the packaged plugin.
 
 Open **Settings → Frica ID**, register the displayed callback URL in your [Frica developer application](https://frica.id/dashboard/developer), enter its OAuth Client ID, and enable sign-in. No client secret is required.
 
-## Changes in v1.0.4
+## Changes in v1.1.0
 
-- Add a fixed, administrator-only verification reason to distinguish malformed JWTs, missing/unknown key IDs, invalid subject/token-use claims, and OpenSSL verification failures.
-- Check required OpenSSL functions before ID-token validation and identify an unavailable verification dependency.
-- Keep diagnostic records limited to fixed categories, an opaque reference and UTC timestamp for 24 hours. Never store tokens, decoded claims or arbitrary exception messages.
-- Retain all signature, issuer, audience, nonce, expiry and account-linking protections. This update improves diagnosis; it does not claim to resolve every hosting-specific verification failure.
+- Use the Public Frica ID as the WordPress username and nickname for new accounts, with a local numeric suffix for collisions. Authentication remains bound to the issuer and subject, never the public username.
+- Upgrade existing generated `frica_` plus 24-hex-character usernames on their next verified Frica sign-in on single sites. Preserve user IDs, passwords, roles, content, display names, author URLs and account links. Retire old sessions and issue a fresh WordPress session.
+- Keep custom usernames and shared Multisite usernames unchanged. Missing or invalid public IDs retain a private generated fallback.
+- Update privacy disclosures for the Public Frica ID profile claim and add registration, collision and migration coverage.
 
 ## Included
 
