@@ -29,7 +29,7 @@ Compatibility checks run against WordPress 6.6 / PHP 8.0 and WordPress 7.1.3 / P
 
 ## Install
 
-1. Download **`frica-id-login-1.0.0.zip`** from [GitHub Releases](https://github.com/evchibo/login-with-frica-id-wordpress/releases/latest). Choose the plugin ZIP under **Assets**, rather than GitHub's generated source archive.
+1. Download **`frica-id-login-1.0.1.zip`** from [GitHub Releases](https://github.com/evchibo/login-with-frica-id-wordpress/releases/latest). Choose the plugin ZIP under **Assets**, rather than GitHub's generated source archive.
 2. In WordPress, open **Plugins → Add New → Upload Plugin**.
 3. Upload the ZIP, install it, and activate **Login with Frica ID**.
 4. Open **Settings → Frica ID** and follow the setup steps below.

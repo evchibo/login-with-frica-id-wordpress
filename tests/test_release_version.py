@@ -9,7 +9,9 @@ import unittest
 from unittest.mock import patch
 import urllib.error
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'tools/release-version.py'
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / 'tools/release-version.py'
+VERSION = (ROOT / 'frica-id-login/readme.txt').read_text().split('Stable tag: ', 1)[1].splitlines()[0]
 
 class ReleaseGuards(unittest.TestCase):
     def run_release(self, response=None, error=None, ref='refs/heads/main'):
@@ -24,10 +26,10 @@ class ReleaseGuards(unittest.TestCase):
         return output.getvalue()
 
     def test_missing_release_can_publish(self):
-        self.assertEqual(self.run_release(error=404), 'tag=v1.0.0\npublish=true\n')
+        self.assertEqual(self.run_release(error=404), f'tag=v{VERSION}\npublish=true\n')
 
     def test_existing_release_is_preserved(self):
-        self.assertEqual(self.run_release(response={'draft': False, 'prerelease': False}), 'tag=v1.0.0\npublish=false\n')
+        self.assertEqual(self.run_release(response={'draft': False, 'prerelease': False}), f'tag=v{VERSION}\npublish=false\n')
 
     def test_api_permission_failure_does_not_publish(self):
         with self.assertRaisesRegex(SystemExit, 'HTTP 403'):

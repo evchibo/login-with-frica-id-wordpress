@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- Correct WordPress.org contributor attribution to the verified publishing account, `ivanchibo`.
+- No changes to authentication behavior.
+
 ## 1.0.0
 
 - Frica ID OpenID Connect login with PKCE S256 and verified email.
