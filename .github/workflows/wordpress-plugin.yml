@@ -1,0 +1,105 @@
+name: WordPress plugin
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wordpress:
+    name: WordPress ${{ matrix.wordpress }} / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '8.0'
+            wordpress: '6.6'
+          - php: '8.3'
+            wordpress: '7.1.3'
+          - php: '8.4'
+            wordpress: '7.1.3'
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: wordpress-test-only
+          MARIADB_DATABASE: frica_wordpress_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      WP_ROOT: /tmp/frica-wp/wordpress
+      WP_TEST_DB_HOST: 127.0.0.1:3306
+      WP_TEST_DB_PASSWORD: wordpress-test-only
+      WP_TEST_PORT: '8787'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, openssl, curl, mbstring, dom, xml, zip
+          coverage: none
+      - name: PHP syntax
+        run: find frica-id-login tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Install isolated WordPress
+        run: |
+          mkdir -p /tmp/frica-wp
+          curl --fail --silent --show-error --location "https://wordpress.org/wordpress-${{ matrix.wordpress }}.tar.gz" | tar -xz -C /tmp/frica-wp
+          ln -s "$GITHUB_WORKSPACE/frica-id-login" "$WP_ROOT/wp-content/plugins/frica-id-login"
+          php tests/setup.php
+      - name: Run real WordPress and database integration tests
+        run: |
+          php -S 127.0.0.1:8787 tests/router.php >/tmp/frica-wordpress-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" || true' EXIT
+          sleep 1
+          php tests/integration.php
+      - name: Build installable package and check dependency integrity
+        run: python3 tools/build.py
+      - uses: actions/upload-artifact@v4
+        if: matrix.php == '8.3'
+        with:
+          name: frica-id-login
+          path: dist/*.zip
+          if-no-files-found: error
+      - name: HTTP diagnostics on failure
+        if: failure()
+        run: cat /tmp/frica-wordpress-http.log || true
+
+  plugin-check:
+    name: WordPress Plugin Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: WordPress/plugin-check-action@v1
+        with:
+          build-dir: frica-id-login
+          strict: 'true'
+
+  release:
+    name: Publish tagged plugin release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [wordpress, plugin-check]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frica-id-login
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true

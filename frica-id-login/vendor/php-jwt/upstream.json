@@ -1,0 +1,42 @@
+{
+  "package": "firebase/php-jwt",
+  "version": "7.2.1",
+  "commit": "0501f5729b9e2448516674aff07c7d1727869b8e",
+  "source": "https://github.com/googleapis/php-jwt",
+  "license": "BSD-3-Clause",
+  "modification": "Namespace Firebase\\JWT replaced with FricaID\\Vendor\\Firebase\\JWT; no functional changes.",
+  "files": {
+    "JWT.php": {
+      "upstream_sha256": "fa59d2771a8a6542cb33f40de460fd60f54c49b0334a568b1697be7154f6522c",
+      "bundled_sha256": "bc5919f68fd3a57c60f42f7e65abda131617f3e8d968194af0f017adb9366eed"
+    },
+    "JWK.php": {
+      "upstream_sha256": "f4895c87128079ec16ba130b0eab0717a34622afb1578e42bb4dec61f4728411",
+      "bundled_sha256": "440952784813e2d3b7afc74d37137f0cfa2205454600658318416ec6e6062e6c"
+    },
+    "Key.php": {
+      "upstream_sha256": "458bc77981ae49a8fd15dee7781d5b69e88e701536901488a90241134d522e07",
+      "bundled_sha256": "c52cfc2732b48bd4dae047793bd9f649c3cf384ada7ac13b31d2804d7ba7ed7e"
+    },
+    "BeforeValidException.php": {
+      "upstream_sha256": "77fe003a44eb941bfd2fac7399f8ca761511a2ad49117f093ef12489b6f09cd0",
+      "bundled_sha256": "b743f5081fba41a6088f6638f40cb451c80b0315203d8148ad3ee745940eb8bd"
+    },
+    "ExpiredException.php": {
+      "upstream_sha256": "fe92315afbde5a898deabc1562b0f1bc3793bade3c2e61231619aa4849cf476d",
+      "bundled_sha256": "6ee1beac854575b2342644555708ec0564fa076ca595cab3c32ae80ac756ee5b"
+    },
+    "SignatureInvalidException.php": {
+      "upstream_sha256": "fc624b17bf730387079c3b25dd282743259bd3c6c20920e007879412c85ebdee",
+      "bundled_sha256": "c3f00f470cd18ade4a0194e2ccae1a26a2555b5cd03bddd82f3b2b57d27ff038"
+    },
+    "JWTExceptionWithPayloadInterface.php": {
+      "upstream_sha256": "899678f85fe560248895cf921b70ec95ad87b68d5c4da4ff561870d6942cacac",
+      "bundled_sha256": "42365867c4d58cee6da26a198b0b82970b4bb80344be45533a456cc1f246f2f1"
+    },
+    "LICENSE": {
+      "upstream_sha256": "00e641cb185172e752bb3ab744925502c099dca06c9ecf53ea6fba941a65910c",
+      "bundled_sha256": "00e641cb185172e752bb3ab744925502c099dca06c9ecf53ea6fba941a65910c"
+    }
+  }
+}
