@@ -1,40 +1,20 @@
-WordPress - Web publishing software
+Login with Frica ID for WordPress
+Copyright (c) 2026 Frica and contributors.
 
-Copyright 2011-2026 by the contributors
+The original code in this project is free software licensed under the GNU
+General Public License, version 2 or (at your option) any later version
+(SPDX-License-Identifier: GPL-2.0-or-later).
 
-This program is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2 of the License, or
-(at your option) any later version.
+You may use, study, modify and redistribute it under those terms, including
+for commercial purposes. When distributing covered code or modifications,
+preserve applicable notices and provide corresponding source under the GPL.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+This software is distributed without any warranty. See the complete license
+below for its terms and conditions.
 
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-This program incorporates work covered by the following copyright and
-permission notices:
-
-  b2 is (c) 2001, 2002 Michel Valdrighi - Cafelog
-
-  Wherever third party code has been used, credit has been given in the code's
-  comments.
-
-  b2 is released under the GPL
-
-and
-
-  WordPress - Web publishing software
-
-  Copyright 2003-2010 by the contributors
-
-  WordPress is released under the GPL
-
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+The bundled firebase/php-jwt library retains its BSD-3-Clause license in
+frica-id-login/vendor/php-jwt/LICENSE (vendor/php-jwt/LICENSE in the installed
+plugin). Its upstream copyright and license notices are preserved.
 
                     GNU GENERAL PUBLIC LICENSE
                        Version 2, June 1991
@@ -375,10 +355,3 @@ proprietary programs.  If your program is a subroutine library, you may
 consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.
-
-WRITTEN OFFER
-
-The source code for any program binaries or compressed scripts that are
-included with WordPress can be freely obtained at the following URL:
-
-	https://wordpress.org/download/source/

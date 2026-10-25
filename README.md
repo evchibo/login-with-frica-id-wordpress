@@ -1,56 +1,115 @@
 # Login with Frica ID for WordPress
 
-An installable, GPL-licensed plugin for Frica ID sign-in using OpenID Connect authorization code + PKCE S256. The standard Frica developer application is a PUBLIC client; configure its OAuth Client ID, with no secret or API key.
+**Let your visitors sign in with their [Frica ID](https://frica.id).**
 
-## Installation
+A free, open-source WordPress plugin for secure single sign-on using OpenID Connect and PKCE. Add a login button, connect existing WordPress accounts, or let new members register with a verified Frica email address.
 
-Build the package with `python3 tools/build.py`. Upload the ZIP under **WordPress → Plugins → Add New → Upload Plugin**, then activate it. Open **Settings → Frica ID** for the exact callback URI and setup steps.
+[Frica ID website](https://frica.id) · [Download the latest plugin](https://github.com/evchibo/login-with-frica-id-wordpress/releases/latest) · [Setup guide](#setup) · [Report a bug](https://github.com/evchibo/login-with-frica-id-wordpress/issues)
 
-Create an app at [Frica's developer portal](https://frica.id/dashboard/developer), register the exact URI shown in WordPress, and allow `openid profile email`. Save its OAuth Client ID and enable the plugin. Sites require HTTPS, PHP 8.0+ with OpenSSL, and WordPress 6.6+.
+## Features
 
-Existing members sign into WordPress normally, then choose **Users → Profile → Connect Frica ID**. Verified email alone never links an existing WordPress account. New users can register only when both the plugin option and WordPress's **Anyone can register** setting are enabled. New accounts always receive `subscriber`; existing roles are preserved.
+- **Login with Frica ID** on WordPress login and registration screens.
+- A shortcode for pages, posts, widgets and shortcode blocks.
+- Explicit account connection and disconnection from the member's WordPress Profile.
+- Optional new account registration with the **Subscriber** role.
+- Verified email, browser-bound one-use login attempts, PKCE S256 and signed ID-token validation.
+- Local WordPress passwords and recovery remain available.
+- No client secret, API key, tracking scripts or stored authentication tokens.
 
-The plugin adds a button to the standard WordPress login/registration forms. Add `[frica_id_login]` to a page or shortcode block; `[frica_id_login redirect_to="/my-account/"]` chooses a same-origin return path. Normal WordPress passwords and recovery remain available.
+## Requirements
 
-The [packaged readme](frica-id-login/readme.txt) includes external-service disclosures, privacy information, Multisite limitations, caching configuration, security-plugin compatibility and troubleshooting.
+| Requirement | Minimum |
+| --- | --- |
+| WordPress | 6.6 |
+| PHP | 8.0 with OpenSSL |
+| Site connection | HTTPS |
+| Frica configuration | A developer application with an OAuth Client ID |
 
-## Security and data
+Compatibility checks run against WordPress 6.6 / PHP 8.0 and WordPress 7.1.3 / PHP 8.3 and 8.4. MariaDB integration tests and strict WordPress Plugin Check run in CI.
 
-- Single-use database-backed OAuth state, ten-minute expiry, and a Secure/HttpOnly/SameSite=Lax host-only browser cookie.
-- PKCE verifier and nonce bound to each transaction; callback consumes state atomically.
-- Signature verification with an isolated, bundled `firebase/php-jwt` 7.2.1, pinned to upstream commit `0501f5729b9e2448516674aff07c7d1727869b8e`. RS256 keys come only from Frica's fixed HTTPS JWKS endpoint; issuer, audience, azp, nonce, timestamps, token_use and UserInfo subject are checked.
-- No configurable discovery URLs, token-supplied keys, unsigned tokens, browser token storage, client secrets or disabled TLS checks. Provider requests do not follow redirects.
-- Verified email required; account linking requires the logged-in WordPress account, a POST nonce, and the same WordPress session at callback. No automatic email merge.
-- The local connection table stores an issuer-bound subject hash. Internal Frica subject values are never shown as display names or usernames. Provider tokens are not retained; returned refresh tokens are revoked on a best-effort basis.
-- New accounts use random passwords and receive standard WordPress recovery notifications. Profile updates do not overwrite an existing local account's email or permissions.
-- New registration is serialized with a database advisory lock; unique constraints protect both sides of the account connection.
-- API diagnostics are not echoed to visitors. Callback responses use no-store/no-cache and a no-referrer policy. Administrators must omit callback query strings from server logs and bypass caches for login/callback routes.
+## Install
 
-Frica sign-in creates a local WordPress session. Password-specific two-factor/security plugins may require integration: the plugin calls `wp_authenticate_user` and `wp_login`, but cannot promise compatibility with every third-party challenge. WordPress logout does not globally log out of Frica ID. Configure provider assurance and test installed security plugins before rollout.
+1. Download **`frica-id-login-1.0.0.zip`** from [GitHub Releases](https://github.com/evchibo/login-with-frica-id-wordpress/releases/latest). Choose the plugin ZIP under **Assets**, rather than GitHub's generated source archive.
+2. In WordPress, open **Plugins → Add New → Upload Plugin**.
+3. Upload the ZIP, install it, and activate **Login with Frica ID**.
+4. Open **Settings → Frica ID** and follow the setup steps below.
 
-Multisite supports per-site activation and existing site members only. Network-wide activation and plugin-driven new network account creation are intentionally blocked.
+## Setup
 
-## Test and build
+1. Create an application in the [Frica developer portal](https://frica.id/dashboard/developer).
+2. Copy the **exact redirect URI** displayed in WordPress **Settings → Frica ID** into your application's allowed redirect URIs. Preserve the entire URL, including `?action=frica_id_callback`.
+3. Allow the `openid`, `profile` and `email` scopes.
+4. Copy the application's **OAuth Client ID** into WordPress. This is typically an `fcli_` value; do not use a `frik_` API key. Frica's standard application uses PUBLIC-client PKCE and needs no client secret.
+5. Enable sign-in and save your settings.
+6. Test sign-in on your site before inviting visitors to use it.
 
-The GitHub Actions workflow installs real WordPress 6.6/PHP 8.0 and WordPress 7.1.3/PHP 8.3/8.4 with MariaDB 10.11. It executes HTTP redirects, real cookie-authenticated WordPress sessions, PKCE, signed-token validation, account linking, CSRF rejection, role preservation, registration controls, single-use/expiry checks and uninstall preservation. Provider responses use generated test-only RSA keys. No production users or credentials are involved.
+### Existing WordPress members
 
-To reproduce with a disposable database:
+Sign into WordPress normally, open **Users → Profile**, and choose **Connect Frica ID**. Complete the Frica consent screen in the same browser session. The connection preserves the member's WordPress permissions.
 
-1. Download WordPress and set `WP_ROOT` to its extracted `wordpress` directory. Set `WP_TEST_DB_HOST`, `WP_TEST_DB_NAME`, `WP_TEST_DB_USER` and `WP_TEST_DB_PASSWORD` for an empty test database. Never point this harness at an existing site: setup writes wp-config.php and the integration test uninstalls the plugin.
-2. Link `frica-id-login` into `$WP_ROOT/wp-content/plugins/`.
-3. Run `php tests/setup.php`.
-4. Run `php -S 127.0.0.1:8787 tests/router.php`.
-5. In the same environment run `php tests/integration.php`.
-6. Run `python3 tools/build.py` to create `dist/frica-id-login-1.0.0.zip`. The package contains only runtime code, the readme, licenses and pinned dependency sources.
+An email match by itself never links an existing WordPress account. If you see an existing-email message, sign into that WordPress account first and connect it from Profile.
 
-Rebuild the isolated JWT dependency with `python3 tools/vendor-jwt.py`. Its manifest records upstream and bundled SHA256 hashes. Namespace replacement is the only modification; the original BSD license is retained. No Composer install is needed on the user's server.
+### New members
 
-## Releases
+Enable **Allow new subscriber accounts** in the plugin settings and **Anyone can register** in **Settings → General**. Both settings are required. Accounts created by this plugin always receive the Subscriber role, regardless of the site's default role.
 
-Create a version tag such as `v1.0.0` after updating the plugin header, stable tag and changelog. CI tests the tag and publishes an installable ZIP to GitHub Releases only after every compatibility and Plugin Check job succeeds. The plugin does not install an external updater; manual ZIP updates work until a WordPress.org listing is approved.
+### Add a button to a page
 
-## Public distribution
+Use a Shortcode block:
 
-The ZIP is suitable for manual WordPress installation and includes the files needed for a WordPress.org submission. A directory listing is a separate publication step: it requires a WordPress.org contributor account, an approved plugin slug, review of the current directory guidelines and WordPress.org review approval. GitHub distribution does not imply directory approval, automatic updates from WordPress.org, or a live end-to-end sign-in on an external site.
+```text
+[frica_id_login]
+```
 
-Before enabling on a live site, register that site's real redirect URI and exercise a new account, existing linked member, same-email collision, explicit connection, disconnect, logout and password recovery. Keep WordPress password login available while checking third-party membership/MFA compatibility.
+Choose a return path on your own site:
+
+```text
+[frica_id_login redirect_to="/my-account/"]
+```
+
+A signed-in visitor sees a link to manage their Frica ID connection.
+
+## Privacy and account security
+
+The plugin requests your name and verified email through [Frica ID](https://frica.id), using `openid profile email`. It does not request KYC, wallet, payment or phone information. A private one-way account-reference hash recognizes the connection; Frica's internal user identifier is not displayed as a member's username or name.
+
+Login state expires after ten minutes and can be consumed only once. The flow uses a Secure, HttpOnly, SameSite=Lax cookie, PKCE S256, nonce binding, RS256 signatures, issuer/audience checks and matching UserInfo subjects. Access and refresh tokens are not retained; unnecessary refresh tokens are revoked on a best-effort basis.
+
+Frica ID is an external service. Read its [Privacy Policy](https://frica.id/legal/privacy) and [Terms](https://frica.id/legal/terms). The [packaged readme](frica-id-login/readme.txt) contains the full service and data-retention disclosures. Suggested privacy-policy text is available through WordPress's privacy tools after activation.
+
+## Compatibility and troubleshooting
+
+- **HTTPS:** Configure WordPress and any reverse proxy to recognize HTTPS correctly. The plugin does not enable sign-in on an insecure site.
+- **Caching:** Exclude `wp-login.php` and `wp-admin/admin-post.php` from caching. Omit OAuth callback query strings from access logs and analytics.
+- **Expired attempts:** Start again in the same browser with secure cookies enabled.
+- **Existing email:** Sign into WordPress first, then connect Frica ID from your Profile.
+- **Membership and MFA plugins:** Frica authenticates the member and WordPress creates the local session. `wp_authenticate_user` and `wp_login` hooks run, but password-specific challenges and custom membership workflows may require integration. Test your installed plugins before rollout.
+- **Logout:** WordPress logout ends the WordPress session. It does not sign the visitor out of Frica ID globally.
+- **Multisite:** Activate and configure separately on each site. Existing users must already belong to that site. Network-wide activation and creation of new network accounts through this plugin are not supported.
+- **Disconnecting:** Confirm WordPress password login or email recovery works before disconnecting. Disconnect removes only the connection; uninstall removes plugin-owned data and settings while retaining WordPress users and content.
+
+## Development
+
+Source, tests and packaging tools live in this repository. No Composer installation is required on a user's server.
+
+```bash
+python3 tools/build.py
+```
+
+This creates a WordPress-uploadable ZIP in `dist/` and checks the bundled dependency hashes. See [CONTRIBUTING.md](CONTRIBUTING.md) for the disposable WordPress test setup. The integration harness writes `wp-config.php` and uninstalls the plugin at the end; never run it against an existing site.
+
+The bundled `firebase/php-jwt` 7.2.1 is pinned to upstream commit `0501f5729b9e2448516674aff07c7d1727869b8e` and isolated in a private namespace. Its original BSD license and provenance hashes are included. `python3 tools/vendor-jwt.py` rebuilds that dependency.
+
+## Releases and WordPress.org
+
+After the compatibility matrix and Plugin Check pass, a push to `main` automatically publishes a GitHub release if that plugin version has no release yet. Existing releases are preserved: increment the plugin version, readme stable tag and changelog for a new release. Explicit version tags are supported too. Release notes come from [RELEASE_NOTES.md](RELEASE_NOTES.md).
+
+The plugin is distributed on GitHub. **A WordPress.org listing is not yet approved.** See [WORDPRESS_ORG.md](WORDPRESS_ORG.md) for submission and review steps. Automatic WordPress.org updates become available only after directory approval and publication; this plugin does not install a third-party updater.
+
+## Support and license
+
+For ordinary issues, use [GitHub Issues](https://github.com/evchibo/login-with-frica-id-wordpress/issues). For sensitive security reports, see [SECURITY.md](SECURITY.md).
+
+Copyright © 2026 Frica and contributors. Licensed under **[GPL-2.0-or-later](LICENSE.txt)**: the general public may use, study, modify and redistribute the plugin, including commercially, under the license terms. Distributing covered code or modifications requires preserving notices and making the corresponding source available under the GPL. The bundled JWT library retains its [BSD-3-Clause license](frica-id-login/vendor/php-jwt/LICENSE).
+
+Visit **[frica.id](https://frica.id)** to learn about Frica ID.

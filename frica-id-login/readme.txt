@@ -14,6 +14,8 @@ Add Frica ID sign-in to WordPress with secure account linking and OpenID Connect
 
 Login with Frica ID lets visitors sign into your WordPress site through their Frica ID account. A site administrator registers a Frica developer application and configures its OAuth Client ID. No client secret or API key is required.
 
+Learn more at [Frica ID](https://frica.id).
+
 Features:
 
 * Login button on the standard WordPress sign-in and registration screens.
