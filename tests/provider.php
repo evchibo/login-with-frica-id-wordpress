@@ -8,6 +8,7 @@ function frica_test_provider($preempt, $args, $url) {
     $encode = static function ($data) { return rtrim(strtr(base64_encode($data), '+/', '-_'), '='); };
     $path = wp_parse_url($url, PHP_URL_PATH);
     $data = [];
+    $status = 200;
     if ($path === '/.well-known/jwks.json') {
         $data = ['keys' => [['kty' => 'RSA', 'use' => 'sig', 'alg' => 'RS256', 'kid' => 'suite-key', 'n' => $encode($details['rsa']['n']), 'e' => $encode($details['rsa']['e'])]]];
     } elseif ($path === '/oauth/token') {
@@ -18,6 +19,7 @@ function frica_test_provider($preempt, $args, $url) {
             || FricaID\WordPress\OIDC::challenge($body['code_verifier'] ?? '') !== $spec['challenge']) {
             return ['response' => ['code' => 400], 'body' => '{}', 'headers' => []];
         }
+        $status = $spec['token_status'] ?? 201; // Match the deployed NestJS POST success status.
         $claims = array_merge(['iss' => 'https://frica.id', 'sub' => $spec['sub'], 'aud' => 'fcli_wordpress_suite',
             'iat' => time(), 'exp' => time() + 900, 'nonce' => $spec['nonce'], 'token_use' => 'id'], $spec['claims'] ?? []);
         $jwt = FricaID\Vendor\Firebase\JWT\JWT::encode($claims, $private, 'RS256', 'suite-key');
@@ -30,6 +32,6 @@ function frica_test_provider($preempt, $args, $url) {
     } elseif ($path === '/oauth/revoke') {
         update_option('frica_suite_revoked', $args['body']['token']);
     } else { throw new RuntimeException('Unexpected provider endpoint'); }
-    return ['response' => ['code' => 200], 'body' => wp_json_encode($data), 'headers' => []];
+    return ['response' => ['code' => $status], 'body' => wp_json_encode($data), 'headers' => []];
 }
 add_filter('pre_http_request', 'frica_test_provider', 10, 3);

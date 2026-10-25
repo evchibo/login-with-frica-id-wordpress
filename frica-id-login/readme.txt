@@ -4,7 +4,7 @@ Tags: login, single sign on, openid connect, oauth, frica
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -91,6 +91,11 @@ State must be used once, within ten minutes, in the same browser. Secure cookies
 
 == Changelog ==
 
+= 1.0.2 =
+* Accept successful HTTP 201 token responses from older Frica deployments.
+* Distinguish rejected sign-in attempts and rate limits from transport failures.
+* Preserve token signature, nonce, audience, issuer and UserInfo validation.
+
 = 1.0.1 =
 * Correct WordPress.org contributor attribution for the verified publishing account.
 
@@ -98,6 +103,9 @@ State must be used once, within ten minutes, in the same browser. Secure cookies
 * Initial release with OpenID Connect, PKCE, explicit linking, optional Subscriber registration and a login shortcode.
 
 == Upgrade Notice ==
+
+= 1.0.2 =
+Fixes successful sign-in attempts incorrectly reporting that Frica ID could not be reached.
 
 = 1.0.1 =
 Contributor metadata correction for WordPress.org submission; sign-in behavior is unchanged.

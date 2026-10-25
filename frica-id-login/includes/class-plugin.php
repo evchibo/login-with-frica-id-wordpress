@@ -353,6 +353,8 @@ final class Plugin {
             'membership' => __('Your WordPress account must belong to this site before you can connect Frica ID.', 'frica-id-login'),
             'login_blocked' => __('This WordPress account cannot sign in. Contact the site administrator.', 'frica-id-login'),
             'storage' => __('The site could not complete sign-in. Try again or contact the site administrator.', 'frica-id-login'),
+            'authorization_rejected' => __('Frica ID rejected this sign-in attempt. Start again. If it keeps happening, ask the site administrator to check the OAuth Client ID and registered callback URL.', 'frica-id-login'),
+            'provider_busy' => __('Frica ID is receiving too many requests. Wait a little and try again.', 'frica-id-login'),
             'provider_unavailable' => __('Frica ID could not be reached. Try again shortly or use your WordPress login.', 'frica-id-login'),
             'invalid_request' => __('This sign-in request is invalid. Start again from the login page.', 'frica-id-login'),
             'registration_failed' => __('Your WordPress account could not be created. Contact the site administrator.', 'frica-id-login'),

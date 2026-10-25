@@ -108,10 +108,28 @@ $settings = Plugin::options(); update_option('frica_id_settings', array_merge($s
 [$start, $q] = begin(); spec($q, 'closed-registration', 'new-closed', 'closed@example.test');
 $closed = finish($start, $q, 'closed-registration');
 check(strpos($closed['headers']['location'][0] ?? '', 'registration_disabled') !== false, 'registration disabled is respected');
-[$start, $q] = begin(); spec($q, 'existing-login', $sub, 'new-member@example.test');
+[$start, $q] = begin(); spec($q, 'existing-login', $sub, 'new-member@example.test', ['token_status' => 200]);
 $again = finish($start, $q, 'existing-login');
 check(($again['headers']['location'][0] ?? '') === home_url('/members/'), 'linked member can sign in when registration closed');
 update_option('frica_id_settings', $settings);
+
+// Status-code and transport failures must not look like a successful authentication.
+$transport = static function ($preempt, $args, $url) {
+    if (strpos($url, OIDC::API) !== 0) { return $preempt; }
+    $mode = $GLOBALS['frica_response_mode'];
+    if ($mode === 'transport') { return new WP_Error('http_request_failed', 'private transport diagnostics'); }
+    return ['response' => ['code' => $mode], 'body' => '{"detail":"private provider diagnostics"}', 'headers' => []];
+};
+add_filter('pre_http_request', $transport, 20, 3);
+foreach ([400 => 'authorization_rejected', 401 => 'authorization_rejected', 403 => 'authorization_rejected', 429 => 'provider_busy', 500 => 'provider_unavailable', 302 => 'invalid_response', 202 => 'invalid_response', 204 => 'invalid_response', 'transport' => 'provider_unavailable'] as $mode => $expected) {
+    $GLOBALS['frica_response_mode'] = $mode;
+    try { OIDC::request('/oauth/token', ['method' => 'POST']); throw new RuntimeException('unexpected_success'); }
+    catch (RuntimeException $error) { check($error->getMessage() === $expected, 'classifies token response ' . $mode . ' without exposing diagnostics'); }
+}
+$GLOBALS['frica_response_mode'] = 201;
+try { OIDC::request('/oauth/userinfo'); throw new RuntimeException('unexpected_success'); }
+catch (RuntimeException $error) { check($error->getMessage() === 'invalid_response', '201 tolerance is limited to token endpoint'); }
+remove_filter('pre_http_request', $transport, 20);
 
 // Exercise account linking and disconnection through the actual authenticated endpoints.
 $admin_cookies = login_cookies($admin->ID);

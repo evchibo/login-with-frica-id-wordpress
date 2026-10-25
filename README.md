@@ -29,7 +29,7 @@ Compatibility checks run against WordPress 6.6 / PHP 8.0 and WordPress 7.1.3 / P
 
 ## Install
 
-1. Download **`frica-id-login-1.0.1.zip`** from [GitHub Releases](https://github.com/evchibo/login-with-frica-id-wordpress/releases/latest). Choose the plugin ZIP under **Assets**, rather than GitHub's generated source archive.
+1. Download **`frica-id-login-1.0.2.zip`** from [GitHub Releases](https://github.com/evchibo/login-with-frica-id-wordpress/releases/latest). Choose the plugin ZIP under **Assets**, rather than GitHub's generated source archive.
 2. In WordPress, open **Plugins → Add New → Upload Plugin**.
 3. Upload the ZIP, install it, and activate **Login with Frica ID**.
 4. Open **Settings → Frica ID** and follow the setup steps below.
@@ -81,6 +81,7 @@ Frica ID is an external service. Read its [Privacy Policy](https://frica.id/lega
 
 - **HTTPS:** Configure WordPress and any reverse proxy to recognize HTTPS correctly. The plugin does not enable sign-in on an insecure site.
 - **Caching:** Exclude `wp-login.php` and `wp-admin/admin-post.php` from caching. Omit OAuth callback query strings from access logs and analytics.
+- **Connection errors:** Version 1.0.2 accepts the legacy HTTP 201 success response from the token endpoint. Rejected authorization attempts and rate limits have separate messages. Actual transport errors still require the WordPress server to reach `https://api.frica.id` over HTTPS.
 - **Expired attempts:** Start again in the same browser with secure cookies enabled.
 - **Existing email:** Sign into WordPress first, then connect Frica ID from your Profile.
 - **Membership and MFA plugins:** Frica authenticates the member and WordPress creates the local session. `wp_authenticate_user` and `wp_login` hooks run, but password-specific challenges and custom membership workflows may require integration. Test your installed plugins before rollout.

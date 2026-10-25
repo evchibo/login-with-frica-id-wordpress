@@ -1,17 +1,19 @@
-# Login with Frica ID for WordPress — v1.0.1
+# Login with Frica ID for WordPress — v1.0.2
 
 Add secure **[Frica ID](https://frica.id)** sign-in to your WordPress website.
 
 ## Download and install
 
-Download **`frica-id-login-1.0.1.zip`** from the release assets. In WordPress, open **Plugins → Add New → Upload Plugin**, install the ZIP, and activate it. GitHub's automatically generated source archives are development source, not the packaged plugin.
+Download **`frica-id-login-1.0.2.zip`** from the release assets. In WordPress, open **Plugins → Add New → Upload Plugin**, install the ZIP, and activate it. GitHub's automatically generated source archives are development source, not the packaged plugin.
 
 Open **Settings → Frica ID**, register the displayed callback URL in your [Frica developer application](https://frica.id/dashboard/developer), enter its OAuth Client ID, and enable sign-in. No client secret is required.
 
-## Changes in v1.0.1
+## Changes in v1.0.2
 
-- Correct WordPress.org contributor attribution to the verified publishing account, `ivanchibo`.
-- Preserve the existing sign-in behavior and GPL-2.0-or-later licensing.
+- Fix successful sign-in being reported as “Frica ID could not be reached” when older Frica servers return HTTP 201 from the token endpoint.
+- Support HTTP 200 and the legacy HTTP 201 token response while retaining signature, nonce, issuer, audience and subject validation.
+- Show distinct messages for rejected authorization attempts, rate limits and connection failures.
+- Expand the real WordPress integration suite to 67 assertions, including both token success statuses and unsuccessful HTTP responses.
 
 ## Included
 

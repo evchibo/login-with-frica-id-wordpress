@@ -24,8 +24,17 @@ final class OIDC {
             'timeout' => 15, 'redirection' => 0, 'sslverify' => true,
             'limit_response_size' => 131072, 'headers' => ['Accept' => 'application/json'],
         ], $args));
-        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-            throw new \RuntimeException('provider_unavailable');
+        if (is_wp_error($response)) { throw new \RuntimeException('provider_unavailable'); }
+        $status = (int) wp_remote_retrieve_response_code($response);
+        // Older Frica deployments return NestJS's default 201 for token POSTs.
+        // Tolerate that success response only here; token signature/claims remain mandatory.
+        if ($status !== 200 && !($path === '/oauth/token' && $status === 201)) {
+            if ($status === 429) { throw new \RuntimeException('provider_busy'); }
+            if (in_array($path, ['/oauth/token', '/oauth/userinfo'], true) && in_array($status, [400, 401, 403], true)) {
+                throw new \RuntimeException('authorization_rejected');
+            }
+            if ($status >= 500) { throw new \RuntimeException('provider_unavailable'); }
+            throw new \RuntimeException('invalid_response');
         }
         $data = json_decode(wp_remote_retrieve_body($response), true);
         if (!is_array($data)) { throw new \RuntimeException('invalid_response'); }
@@ -55,8 +64,9 @@ final class OIDC {
         // Refresh once for key rotation; never trust token-supplied URLs or keys.
         $claims = null;
         for ($attempt = 0; $attempt < 2; $attempt++) {
+            $keys = self::keys($attempt === 1);
             try {
-                $claims = (array) JWT::decode($token, JWK::parseKeySet(self::keys($attempt === 1), 'RS256'));
+                $claims = (array) JWT::decode($token, JWK::parseKeySet($keys, 'RS256'));
                 break;
             } catch (\Throwable $error) {
                 if ($attempt === 1) { throw new \RuntimeException('invalid_token'); }
