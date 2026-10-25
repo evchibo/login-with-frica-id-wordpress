@@ -68,7 +68,7 @@ final class OIDC {
             self::$stage = 'signing_keys';
             $keys = self::keys($attempt === 1);
             try { $parsed_keys = JWK::parseKeySet($keys, 'RS256'); }
-            catch (\Throwable $error) { throw new \RuntimeException('signing_keys_invalid', 0, $error); }
+            catch (\Throwable $error) { throw new \RuntimeException('signing_keys_invalid'); }
             self::$stage = 'id_token';
             // Use the same bounded clock tolerance for the JWT library and our explicit iat check.
             // The private library namespace isolates this from other plugins. Always restore it.
@@ -78,13 +78,13 @@ final class OIDC {
                 $claims = (array) JWT::decode($token, $parsed_keys);
                 break;
             } catch (\FricaID\Vendor\Firebase\JWT\BeforeValidException $error) {
-                throw new \RuntimeException('clock_skew', 0, $error);
+                throw new \RuntimeException('clock_skew');
             } catch (\FricaID\Vendor\Firebase\JWT\ExpiredException $error) {
-                throw new \RuntimeException('token_expired', 0, $error);
+                throw new \RuntimeException('token_expired');
             } catch (\FricaID\Vendor\Firebase\JWT\SignatureInvalidException $error) {
-                if ($attempt === 1) { throw new \RuntimeException('signature_invalid', 0, $error); }
+                if ($attempt === 1) { throw new \RuntimeException('signature_invalid'); }
             } catch (\Throwable $error) {
-                if ($attempt === 1) { throw new \RuntimeException('invalid_token', 0, $error); }
+                if ($attempt === 1) { throw new \RuntimeException('invalid_token'); }
             } finally { JWT::$leeway = $previous_leeway; }
         }
         $now = time();
