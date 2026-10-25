@@ -29,7 +29,7 @@ Compatibility checks run against WordPress 6.6 / PHP 8.0 and WordPress 7.1.3 / P
 
 ## Install
 
-1. Download **`frica-id-login-1.0.3.zip`** from [GitHub Releases](https://github.com/evchibo/login-with-frica-id-wordpress/releases/latest). Choose the plugin ZIP under **Assets**, rather than GitHub's generated source archive.
+1. Download **`frica-id-login-1.0.4.zip`** from [GitHub Releases](https://github.com/evchibo/login-with-frica-id-wordpress/releases/latest). Choose the plugin ZIP under **Assets**, rather than GitHub's generated source archive.
 2. In WordPress, open **Plugins → Add New → Upload Plugin**.
 3. Upload the ZIP, install it, and activate **Login with Frica ID**.
 4. Open **Settings → Frica ID** and follow the setup steps below.
@@ -83,7 +83,7 @@ Frica ID is an external service. Read its [Privacy Policy](https://frica.id/lega
 - **Caching:** Exclude `wp-login.php` and `wp-admin/admin-post.php` from caching. Omit OAuth callback query strings from access logs and analytics.
 - **Connection errors:** Version 1.0.2 accepts the legacy HTTP 201 success response from the token endpoint. Rejected authorization attempts and rate limits have separate messages. Actual transport errors still require the WordPress server to reach `https://api.frica.id` over HTTPS.
 - **Expired attempts:** Start again in the same browser with secure cookies enabled.
-- **Verification failures:** Read the specific error and support reference. Administrators can match the reference in **Settings → Frica ID → Last sign-in diagnostic**. The latest diagnostic expires after 24 hours and contains only its reference, stage, code and UTC timestamp. No tokens, credentials, emails or provider bodies are retained. Verification tolerates a maximum 30-second clock difference; expired tokens remain rejected.
+- **Verification failures:** Read the specific error and support reference. Administrators can match the reference in **Settings → Frica ID → Last sign-in diagnostic**. The latest diagnostic expires after 24 hours and contains only its reference, stage, code, fixed reason category and UTC timestamp. No tokens, credentials, emails or provider bodies are retained. Verification tolerates a maximum 30-second clock difference; expired tokens remain rejected.
 - **Existing email:** Sign into WordPress first, then connect Frica ID from your Profile.
 - **Membership and MFA plugins:** Frica authenticates the member and WordPress creates the local session. `wp_authenticate_user` and `wp_login` hooks run, but password-specific challenges and custom membership workflows may require integration. Test your installed plugins before rollout.
 - **Logout:** WordPress logout ends the WordPress session. It does not sign the visitor out of Frica ID globally.

@@ -4,7 +4,7 @@ Tags: login, single sign on, openid connect, oauth, frica
 Requires at least: 6.6
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.0.3
+Stable tag: 1.0.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -59,7 +59,7 @@ A secure browser cookie and server-side login transaction expire after ten minut
 
 = How do I diagnose a verification failure? =
 
-The login page shows a specific safe error and a support reference. Administrators can open Settings > Frica ID > Last sign-in diagnostic to match that reference to the last failure stage and code. Only the latest record is kept, for 24 hours, without tokens, authorization codes, passwords, emails or provider response bodies. Clock differences up to 30 seconds are tolerated during verification; expired tokens remain rejected. Larger differences require fixing server time synchronization.
+The login page shows a specific safe error and a support reference. Administrators can open Settings > Frica ID > Last sign-in diagnostic to match that reference to the last failure stage, code and fixed reason category. Only the latest record is kept, for 24 hours, without tokens, authorization codes, passwords, emails or provider response bodies. Clock differences up to 30 seconds are tolerated during verification; expired tokens remain rejected. Larger differences require fixing server time synchronization.
 
 
 = Can I link an existing WordPress account? =
@@ -96,6 +96,9 @@ State must be used once, within ten minutes, in the same browser. Secure cookies
 
 == Changelog ==
 
+= 1.0.4 =
+* Identify fixed token-verification reasons and missing OpenSSL dependencies without recording tokens, claims or arbitrary exception messages.
+
 = 1.0.3 =
 * Apply a consistent maximum 30-second clock tolerance during JWT verification; expired tokens are still rejected.
 * Identify signature, issuer, audience, nonce, token-time and response failures with safe messages.
@@ -113,6 +116,9 @@ State must be used once, within ten minutes, in the same browser. Secure cookies
 * Initial release with OpenID Connect, PKCE, explicit linking, optional Subscriber registration and a login shortcode.
 
 == Upgrade Notice ==
+
+= 1.0.4 =
+Adds safe administrator-only verification reasons. Retry sign-in and match the reference in Settings > Frica ID.
 
 = 1.0.3 =
 Adds bounded clock tolerance and precise verification diagnostics. See Settings > Frica ID for the last failure reference and stage.

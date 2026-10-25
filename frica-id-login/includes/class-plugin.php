@@ -129,7 +129,7 @@ final class Plugin {
             <?php $diagnostic = get_transient('frica_id_last_failure'); if (is_array($diagnostic)) : ?>
                 <h2><?php esc_html_e('Last sign-in diagnostic', 'frica-id-login'); ?></h2>
                 <p><?php esc_html_e('Only the latest failure is kept for 24 hours. No tokens, authorization codes, passwords, email addresses or provider response bodies are stored here.', 'frica-id-login'); ?></p>
-                <dl><?php foreach (['reference', 'stage', 'code', 'time'] as $field) : ?>
+                <dl><?php foreach (['reference', 'stage', 'code', 'reason', 'time'] as $field) : ?>
                     <dt><strong><?php echo esc_html(ucfirst($field)); ?></strong></dt><dd><code><?php echo esc_html((string) ($diagnostic[$field] ?? '')); ?></code></dd>
                 <?php endforeach; ?></dl>
             <?php endif; ?>
@@ -259,7 +259,7 @@ final class Plugin {
         } catch (\Throwable $error) {
             $code = isset(self::messages()[$error->getMessage()]) ? $error->getMessage() : 'site_error';
             $reference = bin2hex(random_bytes(6));
-            set_transient('frica_id_last_failure', ['reference' => $reference, 'code' => $code, 'stage' => $stage === 'authentication' ? OIDC::$stage : $stage, 'time' => gmdate('Y-m-d H:i:s')], DAY_IN_SECONDS);
+            set_transient('frica_id_last_failure', ['reference' => $reference, 'code' => $code, 'reason' => OIDC::$reason, 'stage' => $stage === 'authentication' ? OIDC::$stage : $stage, 'time' => gmdate('Y-m-d H:i:s')], DAY_IN_SECONDS);
             $this->fail($code, $reference);
         }
     }

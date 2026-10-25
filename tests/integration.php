@@ -146,8 +146,26 @@ foreach ([['iat' => time() + 45], ['nbf' => time() + 45], ['exp' => time() - 1]]
     check(FricaID\Vendor\Firebase\JWT\JWT::$leeway === 0, 'JWT library clock tolerance restored after failure');
 }
 
+// Independently assemble compact JWTs to exercise parser/key lookup failures without storing token data.
+foreach ([
+    ['token' => 'not-a-jwt', 'reason' => 'jwt_segments'],
+    ['token' => FricaID\Vendor\Firebase\JWT\JWT::encode($base_claims, $private_key, 'RS256', 'unknown-key'), 'reason' => 'jwt_key_id_unknown'],
+    ['token' => FricaID\Vendor\Firebase\JWT\JWT::encode(array_merge($base_claims, ['sub' => 42]), $private_key, 'RS256', 'suite-key'), 'reason' => 'subject_invalid'],
+    ['token' => FricaID\Vendor\Firebase\JWT\JWT::encode(array_merge($base_claims, ['token_use' => 'access']), $private_key, 'RS256', 'suite-key'), 'reason' => 'token_use_invalid'],
+] as $case) {
+    try { OIDC::validate_id_token($case['token'], 'fcli_wordpress_suite', 'clock-test-nonce'); throw new RuntimeException('unexpected_success'); }
+    catch (RuntimeException $error) { check($error->getMessage() === 'invalid_token' && OIDC::$reason === $case['reason'], 'safe reason identifies ' . $case['reason']); }
+}
+OIDC::validate_id_token($future, 'fcli_wordpress_suite', 'clock-test-nonce');
+check(OIDC::$reason === '', 'diagnostic reason resets between verification attempts');
+
+[$reason_start, $reason_query] = begin();
+spec($reason_query, 'diagnostic-reason', $sub, 'new-member@example.test', ['claims' => ['token_use' => 'access']]);
+$reason_failure = finish($reason_start, $reason_query, 'diagnostic-reason');
 $diagnostic = get_transient('frica_id_last_failure');
-check(is_array($diagnostic) && array_keys($diagnostic) === ['reference', 'code', 'stage', 'time'], 'administrator diagnostic stores a bounded metadata record');
+check(($diagnostic['reason'] ?? '') === 'token_use_invalid', 'callback persists only fixed verification reason');
+check(strpos($reason_failure['headers']['location'][0] ?? '', 'frica_id_reference=' . $diagnostic['reference']) !== false, 'login support reference matches administrator diagnostic');
+check(is_array($diagnostic) && array_keys($diagnostic) === ['reference', 'code', 'reason', 'stage', 'time'], 'administrator diagnostic stores a bounded metadata record');
 check(preg_match('/^[a-f0-9]{12}$/D', $diagnostic['reference']) === 1, 'support reference is random opaque text');
 check(strpos(wp_json_encode($diagnostic), 'new-member@example.test') === false && strpos(wp_json_encode($diagnostic), 'private provider diagnostics') === false, 'diagnostic contains no account or provider response data');
 

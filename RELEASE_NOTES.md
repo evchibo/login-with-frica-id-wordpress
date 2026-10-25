@@ -1,19 +1,19 @@
-# Login with Frica ID for WordPress — v1.0.3
+# Login with Frica ID for WordPress — v1.0.4
 
 Add secure **[Frica ID](https://frica.id)** sign-in to your WordPress website.
 
 ## Download and install
 
-Download **`frica-id-login-1.0.3.zip`** from the release assets. In WordPress, open **Plugins → Add New → Upload Plugin**, install the ZIP, and activate it. GitHub's automatically generated source archives are development source, not the packaged plugin.
+Download **`frica-id-login-1.0.4.zip`** from the release assets. In WordPress, open **Plugins → Add New → Upload Plugin**, install the ZIP, and activate it. GitHub's automatically generated source archives are development source, not the packaged plugin.
 
 Open **Settings → Frica ID**, register the displayed callback URL in your [Frica developer application](https://frica.id/dashboard/developer), enter its OAuth Client ID, and enable sign-in. No client secret is required.
 
-## Changes in v1.0.3
+## Changes in v1.0.4
 
-- Apply a consistent maximum 30-second JWT clock tolerance so small differences between issuer and WordPress server clocks do not reject otherwise valid tokens. Already-expired tokens remain rejected.
-- Replace generic verification failures with safe messages identifying signature, issuer, audience, nonce, expiry, clock and response problems.
-- Add a random support reference and an administrator-only last-failure diagnostic under Settings → Frica ID. It stores only a reference, stage, code and UTC timestamp for 24 hours; no tokens, codes, passwords, emails or response bodies.
-- Expand WordPress integration coverage to 85 assertions, including independent clock differences, strict expiry rejection, tolerance restoration and diagnostic privacy.
+- Add a fixed, administrator-only verification reason to distinguish malformed JWTs, missing/unknown key IDs, invalid subject/token-use claims, and OpenSSL verification failures.
+- Check required OpenSSL functions before ID-token validation and identify an unavailable verification dependency.
+- Keep diagnostic records limited to fixed categories, an opaque reference and UTC timestamp for 24 hours. Never store tokens, decoded claims or arbitrary exception messages.
+- Retain all signature, issuer, audience, nonce, expiry and account-linking protections. This update improves diagnosis; it does not claim to resolve every hosting-specific verification failure.
 
 ## Included
 

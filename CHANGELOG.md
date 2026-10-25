@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4
+
+- Add safe verification reason categories and OpenSSL dependency checks.
+- Cover malformed JWTs, unknown signing keys and invalid identity claims.
+
 ## 1.0.3
 
 - Apply consistent bounded clock tolerance during signature/claim verification.

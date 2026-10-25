@@ -10,6 +10,36 @@ final class OIDC {
     public const ISSUER = 'https://frica.id';
     public const API = 'https://api.frica.id';
     public static string $stage = 'authentication';
+    public static string $reason = '';
+
+    private static function invalid_token(string $reason): void {
+        self::$reason = $reason;
+        throw new \RuntimeException('invalid_token');
+    }
+
+    private static function decode_reason(\Throwable $error): string {
+        // Map only fixed messages from the pinned JWT dependency; never retain arbitrary exception text.
+        $reasons = [
+            'Wrong number of segments' => 'jwt_segments',
+            'Invalid header encoding' => 'jwt_header',
+            'Invalid claims encoding' => 'jwt_payload',
+            'Payload must be a JSON object' => 'jwt_payload',
+            'Payload iat must be a number' => 'jwt_time_type',
+            'Payload nbf must be a number' => 'jwt_time_type',
+            'Payload exp must be a number' => 'jwt_time_type',
+            'Empty algorithm' => 'jwt_algorithm',
+            'Algorithm not supported' => 'jwt_algorithm',
+            'Incorrect key for this algorithm' => 'jwt_algorithm',
+            '"kid" empty, unable to lookup correct key' => 'jwt_key_id_missing',
+            '"kid" invalid, unable to lookup correct key' => 'jwt_key_id_unknown',
+            'OpenSSL unable to validate key' => 'openssl_key_invalid',
+            'Unable to validate key' => 'openssl_key_invalid',
+            'Provided key is too short' => 'rsa_key_too_short',
+            'Syntax error, malformed JSON' => 'jwt_json',
+        ];
+        if ($error instanceof \DomainException && strpos($error->getMessage(), 'OpenSSL error:') === 0) { return 'openssl_verify_error'; }
+        return $reasons[$error->getMessage()] ?? ($error instanceof \Error ? 'jwt_runtime_error' : 'jwt_decode_failed');
+    }
 
     public static function random(): string {
         return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
@@ -61,8 +91,13 @@ final class OIDC {
 
     public static function validate_id_token(string $token, string $client, string $nonce): array {
         self::$stage = 'id_token';
+        self::$reason = '';
+        if (!function_exists('openssl_pkey_get_public') || !function_exists('openssl_pkey_get_details') || !function_exists('openssl_verify')) {
+            self::$reason = 'openssl_unavailable';
+            throw new \RuntimeException('verification_dependency');
+        }
         if (!class_exists(JWT::class) || !class_exists(JWK::class)) { throw new \RuntimeException('verification_dependency'); }
-        if (strlen($token) > 32768) { throw new \RuntimeException('invalid_token'); }
+        if (strlen($token) > 32768) { self::invalid_token('jwt_too_large'); }
         $claims = null;
         for ($attempt = 0; $attempt < 2; $attempt++) {
             self::$stage = 'signing_keys';
@@ -84,7 +119,7 @@ final class OIDC {
             } catch (\FricaID\Vendor\Firebase\JWT\SignatureInvalidException $error) {
                 if ($attempt === 1) { throw new \RuntimeException('signature_invalid'); }
             } catch (\Throwable $error) {
-                if ($attempt === 1) { throw new \RuntimeException('invalid_token'); }
+                if ($attempt === 1) { self::invalid_token(self::decode_reason($error)); }
             } finally { JWT::$leeway = $previous_leeway; }
         }
         $now = time();
@@ -94,8 +129,8 @@ final class OIDC {
         if (!in_array($client, $audiences, true)
             || (count($audiences) > 1 && ($claims['azp'] ?? '') !== $client)
             || (isset($claims['azp']) && $claims['azp'] !== $client)) { throw new \RuntimeException('audience_mismatch'); }
-        if (!is_string($claims['sub'] ?? null) || $claims['sub'] === '' || strlen($claims['sub']) > 255
-            || ($claims['token_use'] ?? '') !== 'id') { throw new \RuntimeException('invalid_token'); }
+        if (!is_string($claims['sub'] ?? null) || $claims['sub'] === '' || strlen($claims['sub']) > 255) { self::invalid_token('subject_invalid'); }
+        if (($claims['token_use'] ?? '') !== 'id') { self::invalid_token('token_use_invalid'); }
         if (!is_string($claims['nonce'] ?? null) || !hash_equals($nonce, $claims['nonce'])) { throw new \RuntimeException('nonce_mismatch'); }
         // Expired tokens remain rejected even inside the library's clock-tolerance window.
         if (!is_int($claims['exp'] ?? null) || $claims['exp'] <= $now) { throw new \RuntimeException('token_expired'); }
@@ -105,6 +140,7 @@ final class OIDC {
 
     public static function authenticate(string $code, string $client, array $flow): array {
         self::$stage = 'token_exchange';
+        self::$reason = '';
         $tokens = self::request('/oauth/token', [
             'method' => 'POST', 'body' => [
                 'grant_type' => 'authorization_code', 'client_id' => $client, 'code' => $code,
