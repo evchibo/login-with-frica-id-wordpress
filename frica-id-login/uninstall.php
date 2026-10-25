@@ -9,4 +9,5 @@ $wpdb->query($wpdb->prepare('DROP TABLE IF EXISTS %i', $wpdb->prefix . 'frica_id
 delete_option('frica_id_settings');
 delete_option('frica_id_schema');
 delete_transient('frica_id_jwks');
+delete_transient('frica_id_last_failure');
 wp_clear_scheduled_hook('frica_id_cleanup');

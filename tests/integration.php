@@ -96,6 +96,8 @@ foreach ([
     [$start, $q] = begin(); spec($q, 'reject-' . $name, $sub, 'new-member@example.test', $extra);
     $rejected = finish($start, $q, 'reject-' . $name);
     check(strpos($rejected['headers']['location'][0] ?? '', 'frica_id_error=') !== false, 'rejects invalid ' . $name);
+    $specific = ['issuer' => 'issuer_mismatch', 'audience' => 'audience_mismatch', 'azp' => 'audience_mismatch', 'expiry' => 'token_expired', 'nonce' => 'nonce_mismatch', 'signature' => 'signature_invalid', 'subject' => 'subject_mismatch'];
+    if (isset($specific[$name])) { check(strpos($rejected['headers']['location'][0], 'frica_id_error=' . $specific[$name]) !== false, 'identifies failed ' . $name . ' verification safely'); }
     check(count(array_filter($rejected['headers']['set-cookie'] ?? [], static function ($c) { return strpos($c, 'wordpress_sec_') === 0; })) === 0, 'no WordPress session for invalid ' . $name);
 }
 
@@ -130,6 +132,24 @@ $GLOBALS['frica_response_mode'] = 201;
 try { OIDC::request('/oauth/userinfo'); throw new RuntimeException('unexpected_success'); }
 catch (RuntimeException $error) { check($error->getMessage() === 'invalid_response', '201 tolerance is limited to token endpoint'); }
 remove_filter('pre_http_request', $transport, 20);
+
+// Model independent issuer/WordPress clocks; real provider responses need not share PHP's clock.
+$private_key = file_get_contents(dirname(rtrim(getenv('WP_ROOT'), '/')) . '/test-signing.pem');
+$base_claims = ['iss' => OIDC::ISSUER, 'sub' => 'clock-test-subject', 'aud' => 'fcli_wordpress_suite', 'nonce' => 'clock-test-nonce', 'token_use' => 'id', 'iat' => time(), 'exp' => time() + 900];
+$future = FricaID\Vendor\Firebase\JWT\JWT::encode(array_merge($base_claims, ['iat' => time() + 20]), $private_key, 'RS256', 'suite-key');
+check(OIDC::validate_id_token($future, 'fcli_wordpress_suite', 'clock-test-nonce')['sub'] === 'clock-test-subject', 'valid signed token tolerates a 20-second issuer clock difference');
+check(FricaID\Vendor\Firebase\JWT\JWT::$leeway === 0, 'JWT library clock tolerance restored after verification');
+foreach ([['iat' => time() + 45], ['nbf' => time() + 45], ['exp' => time() - 1]] as $changes) {
+    $token = FricaID\Vendor\Firebase\JWT\JWT::encode(array_merge($base_claims, $changes), $private_key, 'RS256', 'suite-key');
+    try { OIDC::validate_id_token($token, 'fcli_wordpress_suite', 'clock-test-nonce'); throw new RuntimeException('unexpected_success'); }
+    catch (RuntimeException $error) { check($error->getMessage() === (isset($changes['exp']) ? 'token_expired' : 'clock_skew'), 'rejects time claim outside allowed bounds: ' . key($changes)); }
+    check(FricaID\Vendor\Firebase\JWT\JWT::$leeway === 0, 'JWT library clock tolerance restored after failure');
+}
+
+$diagnostic = get_transient('frica_id_last_failure');
+check(is_array($diagnostic) && array_keys($diagnostic) === ['reference', 'code', 'stage', 'time'], 'administrator diagnostic stores a bounded metadata record');
+check(preg_match('/^[a-f0-9]{12}$/D', $diagnostic['reference']) === 1, 'support reference is random opaque text');
+check(strpos(wp_json_encode($diagnostic), 'new-member@example.test') === false && strpos(wp_json_encode($diagnostic), 'private provider diagnostics') === false, 'diagnostic contains no account or provider response data');
 
 // Exercise account linking and disconnection through the actual authenticated endpoints.
 $admin_cookies = login_cookies($admin->ID);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3
+
+- Apply consistent bounded clock tolerance during signature/claim verification.
+- Add precise safe verification errors and private, expiring diagnostic metadata.
+- Preserve strict expired-token, nonce, issuer, audience, signature and subject checks.
+
 ## 1.0.2
 
 - Accept the legacy HTTP 201 token success status without weakening identity verification.

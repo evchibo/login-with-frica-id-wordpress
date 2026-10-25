@@ -9,6 +9,7 @@ if (!defined('ABSPATH')) { exit; }
 final class OIDC {
     public const ISSUER = 'https://frica.id';
     public const API = 'https://api.frica.id';
+    public static string $stage = 'authentication';
 
     public static function random(): string {
         return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
@@ -52,43 +53,58 @@ final class OIDC {
                     $keys[] = $key;
                 }
             }
-            if (!$keys) { throw new \RuntimeException('invalid_keys'); }
+            if (!$keys) { throw new \RuntimeException('signing_keys_invalid'); }
             set_transient('frica_id_jwks', $keys, 3600);
         }
         return ['keys' => $keys];
     }
 
     public static function validate_id_token(string $token, string $client, string $nonce): array {
+        self::$stage = 'id_token';
+        if (!class_exists(JWT::class) || !class_exists(JWK::class)) { throw new \RuntimeException('verification_dependency'); }
         if (strlen($token) > 32768) { throw new \RuntimeException('invalid_token'); }
-        // The bundled JWT library enforces the signature, RS256 algorithm and temporal checks.
-        // Refresh once for key rotation; never trust token-supplied URLs or keys.
         $claims = null;
         for ($attempt = 0; $attempt < 2; $attempt++) {
+            self::$stage = 'signing_keys';
             $keys = self::keys($attempt === 1);
+            try { $parsed_keys = JWK::parseKeySet($keys, 'RS256'); }
+            catch (\Throwable $error) { throw new \RuntimeException('signing_keys_invalid', 0, $error); }
+            self::$stage = 'id_token';
+            // Use the same bounded clock tolerance for the JWT library and our explicit iat check.
+            // The private library namespace isolates this from other plugins. Always restore it.
+            $previous_leeway = JWT::$leeway;
+            JWT::$leeway = 30;
             try {
-                $claims = (array) JWT::decode($token, JWK::parseKeySet($keys, 'RS256'));
+                $claims = (array) JWT::decode($token, $parsed_keys);
                 break;
+            } catch (\FricaID\Vendor\Firebase\JWT\BeforeValidException $error) {
+                throw new \RuntimeException('clock_skew', 0, $error);
+            } catch (\FricaID\Vendor\Firebase\JWT\ExpiredException $error) {
+                throw new \RuntimeException('token_expired', 0, $error);
+            } catch (\FricaID\Vendor\Firebase\JWT\SignatureInvalidException $error) {
+                if ($attempt === 1) { throw new \RuntimeException('signature_invalid', 0, $error); }
             } catch (\Throwable $error) {
-                if ($attempt === 1) { throw new \RuntimeException('invalid_token'); }
-            }
+                if ($attempt === 1) { throw new \RuntimeException('invalid_token', 0, $error); }
+            } finally { JWT::$leeway = $previous_leeway; }
         }
         $now = time();
+        if (($claims['iss'] ?? '') !== self::ISSUER) { throw new \RuntimeException('issuer_mismatch'); }
         $aud = $claims['aud'] ?? null;
         $audiences = is_array($aud) ? $aud : [$aud];
-        if (($claims['iss'] ?? '') !== self::ISSUER || !in_array($client, $audiences, true)
+        if (!in_array($client, $audiences, true)
             || (count($audiences) > 1 && ($claims['azp'] ?? '') !== $client)
-            || (isset($claims['azp']) && $claims['azp'] !== $client)
-            || !is_string($claims['sub'] ?? null) || $claims['sub'] === '' || strlen($claims['sub']) > 255
-            || !is_string($claims['nonce'] ?? null) || !hash_equals($nonce, $claims['nonce'])
-            || !is_int($claims['exp'] ?? null) || $claims['exp'] <= $now
-            || !is_int($claims['iat'] ?? null) || $claims['iat'] > $now + 30 || $claims['iat'] < $now - 1200
-            || ($claims['token_use'] ?? '') !== 'id') {
-            throw new \RuntimeException('invalid_claims');
-        }
+            || (isset($claims['azp']) && $claims['azp'] !== $client)) { throw new \RuntimeException('audience_mismatch'); }
+        if (!is_string($claims['sub'] ?? null) || $claims['sub'] === '' || strlen($claims['sub']) > 255
+            || ($claims['token_use'] ?? '') !== 'id') { throw new \RuntimeException('invalid_token'); }
+        if (!is_string($claims['nonce'] ?? null) || !hash_equals($nonce, $claims['nonce'])) { throw new \RuntimeException('nonce_mismatch'); }
+        // Expired tokens remain rejected even inside the library's clock-tolerance window.
+        if (!is_int($claims['exp'] ?? null) || $claims['exp'] <= $now) { throw new \RuntimeException('token_expired'); }
+        if (!is_int($claims['iat'] ?? null) || $claims['iat'] > $now + 30 || $claims['iat'] < $now - 1200) { throw new \RuntimeException('clock_skew'); }
         return $claims;
     }
 
     public static function authenticate(string $code, string $client, array $flow): array {
+        self::$stage = 'token_exchange';
         $tokens = self::request('/oauth/token', [
             'method' => 'POST', 'body' => [
                 'grant_type' => 'authorization_code', 'client_id' => $client, 'code' => $code,
@@ -101,6 +117,7 @@ final class OIDC {
                 throw new \RuntimeException('invalid_response');
             }
             $claims = self::validate_id_token($tokens['id_token'], $client, $flow['nonce']);
+            self::$stage = 'userinfo';
             $profile = self::request('/oauth/userinfo', [
                 'headers' => ['Accept' => 'application/json', 'Authorization' => 'Bearer ' . $tokens['access_token']],
             ]);

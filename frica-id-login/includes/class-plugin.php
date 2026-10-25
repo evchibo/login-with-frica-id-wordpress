@@ -126,6 +126,13 @@ final class Plugin {
                 </table>
                 <?php submit_button(); ?>
             </form>
+            <?php $diagnostic = get_transient('frica_id_last_failure'); if (is_array($diagnostic)) : ?>
+                <h2><?php esc_html_e('Last sign-in diagnostic', 'frica-id-login'); ?></h2>
+                <p><?php esc_html_e('Only the latest failure is kept for 24 hours. No tokens, authorization codes, passwords, email addresses or provider response bodies are stored here.', 'frica-id-login'); ?></p>
+                <dl><?php foreach (['reference', 'stage', 'code', 'time'] as $field) : ?>
+                    <dt><strong><?php echo esc_html(ucfirst($field)); ?></strong></dt><dd><code><?php echo esc_html((string) ($diagnostic[$field] ?? '')); ?></code></dd>
+                <?php endforeach; ?></dl>
+            <?php endif; ?>
             <h2><?php esc_html_e('Add a button to a page', 'frica-id-login'); ?></h2>
             <p><code>[frica_id_login]</code></p>
             <p><code>[frica_id_login redirect_to="/my-account/"]</code></p>
@@ -232,13 +239,16 @@ final class Plugin {
         if ($flow['user']) {
             if (get_current_user_id() !== $flow['user'] || !hash_equals($flow['session'], hash('sha256', wp_get_session_token()))) { $this->fail('session_changed'); }
         } elseif (is_user_logged_in()) { $this->fail('session_changed'); }
+        $stage = 'authentication';
         try {
             $profile = OIDC::authenticate($code, $flow['client'], $flow);
+            $stage = 'account_resolution';
             $user = $this->resolve_user($profile, (int) $flow['user']);
             if ($flow['user']) {
                 wp_safe_redirect(admin_url('profile.php?frica_id_notice=connected#frica-id'));
                 exit;
             }
+            $stage = 'wordpress_login';
             $checked = apply_filters('wp_authenticate_user', $user, ''); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Invoke the documented WordPress authentication hook for security-plugin checks.
             if (is_wp_error($checked) || !($checked instanceof \WP_User) || $checked->ID !== $user->ID) { throw new \RuntimeException('login_blocked'); }
             wp_set_current_user($user->ID);
@@ -247,7 +257,10 @@ final class Plugin {
             wp_safe_redirect(self::local_redirect($flow['redirect']));
             exit;
         } catch (\Throwable $error) {
-            $this->fail($error->getMessage());
+            $code = isset(self::messages()[$error->getMessage()]) ? $error->getMessage() : 'site_error';
+            $reference = bin2hex(random_bytes(6));
+            set_transient('frica_id_last_failure', ['reference' => $reference, 'code' => $code, 'stage' => $stage === 'authentication' ? OIDC::$stage : $stage, 'time' => gmdate('Y-m-d H:i:s')], DAY_IN_SECONDS);
+            $this->fail($code, $reference);
         }
     }
 
@@ -358,20 +371,36 @@ final class Plugin {
             'provider_unavailable' => __('Frica ID could not be reached. Try again shortly or use your WordPress login.', 'frica-id-login'),
             'invalid_request' => __('This sign-in request is invalid. Start again from the login page.', 'frica-id-login'),
             'registration_failed' => __('Your WordPress account could not be created. Contact the site administrator.', 'frica-id-login'),
+            'clock_skew' => __('The WordPress server clock and Frica ID token time do not agree. Ask the site administrator to check server time synchronization, then start again.', 'frica-id-login'),
+            'token_expired' => __('This Frica ID sign-in token has expired. Start a new sign-in attempt. If it happens immediately, ask the site administrator to check the server clock.', 'frica-id-login'),
+            'signature_invalid' => __('The Frica ID token signature could not be verified. Ask the site administrator to check the signing-key diagnostic.', 'frica-id-login'),
+            'signing_keys_invalid' => __('The site could not read Frica ID signing keys. Ask the site administrator to check the verification diagnostic.', 'frica-id-login'),
+            'verification_dependency' => __('The Frica ID verification library is missing. Ask the site administrator to reinstall the complete plugin ZIP.', 'frica-id-login'),
+            'issuer_mismatch' => __('The Frica ID token issuer did not match the expected service. Ask the site administrator to check the sign-in configuration.', 'frica-id-login'),
+            'audience_mismatch' => __('The Frica ID token was issued for a different application. Ask the site administrator to check the configured OAuth Client ID.', 'frica-id-login'),
+            'nonce_mismatch' => __('The Frica ID sign-in token did not match this browser attempt. Start again from the login page.', 'frica-id-login'),
+            'subject_mismatch' => __('Frica ID returned inconsistent account information. Sign-in was stopped. Contact the site administrator.', 'frica-id-login'),
+            'invalid_response' => __('Frica ID returned an unexpected sign-in response. Contact the site administrator with the support reference.', 'frica-id-login'),
+            'invalid_token' => __('The Frica ID token could not be verified. Contact the site administrator with the support reference.', 'frica-id-login'),
+            'site_error' => __('WordPress could not finish Frica ID sign-in. Contact the site administrator with the support reference.', 'frica-id-login'),
             'failed' => __('Frica ID sign-in could not be verified. Start again or use your WordPress login.', 'frica-id-login'),
         ];
     }
 
-    private function fail(string $code): void {
+    private function fail(string $code, string $reference = ''): void {
         if (!isset(self::messages()[$code])) { $code = 'failed'; }
-        wp_safe_redirect(add_query_arg('frica_id_error', $code, wp_login_url()));
+        wp_safe_redirect(add_query_arg(array_filter(['frica_id_error' => $code, 'frica_id_reference' => $reference]), wp_login_url()));
         exit;
     }
 
     public function login_message(string $message): string {
         $messages = self::messages();
         $code = self::input('frica_id_error');
-        if (isset($messages[$code])) { $message .= '<div class="message frica-id-error" role="alert">' . esc_html($messages[$code]) . '</div>'; }
+        if (isset($messages[$code])) {
+            $reference = self::input('frica_id_reference');
+            $support = preg_match('/^[a-f0-9]{12}$/D', $reference) ? ' ' . __('Support reference:', 'frica-id-login') . ' ' . $reference : '';
+            $message .= '<div class="message frica-id-error" role="alert">' . esc_html($messages[$code] . $support) . '</div>';
+        }
         return $message;
     }
 }
