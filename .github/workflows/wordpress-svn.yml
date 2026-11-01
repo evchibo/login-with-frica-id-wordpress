@@ -1,0 +1,150 @@
+name: Publish to WordPress.org SVN
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing stable GitHub release tag (for example v1.1.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Preview SVN changes without committing'
+        required: true
+        default: true
+        type: boolean
+  workflow_call:
+    inputs:
+      validated_sha:
+        description: 'Exact commit already validated by the calling CI jobs'
+        required: false
+        default: ''
+        type: string
+      tag:
+        required: true
+        type: string
+      dry_run:
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      SVN_USERNAME:
+        required: false
+      SVN_PASSWORD:
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: wordpress-org-svn
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Manual runs use main's automation; PRs can never reach deployment secrets.
+    if: >-
+      github.repository == 'evchibo/login-with-frica-id-wordpress' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate requested tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+            echo 'Use an existing stable tag, for example v1.1.0.' >&2
+            exit 1
+          }
+      - name: Check out deployment tools
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          path: automation
+      - name: Check out immutable release
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: release-source
+      - name: Require release ancestry on main
+        run: git -C release-source merge-base --is-ancestor HEAD origin/main
+      - name: Install SVN
+        run: |
+          if ! command -v svn >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install --yes subversion
+          fi
+      - name: Verify release, successful CI, versions and SVN history
+        id: preflight
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          VALIDATED_SHA: ${{ inputs.validated_sha }}
+        run: |
+          python3 automation/tools/wordpress-svn.py \
+            --source release-source --tag "$RELEASE_TAG" \
+            --sha "$(git -C release-source rev-parse HEAD)" \
+            --validated-sha "$VALIDATED_SHA" >> "$GITHUB_OUTPUT"
+      - name: Build exact release package and verify dependency hashes
+        if: steps.preflight.outputs.publish == 'true'
+        run: python3 release-source/tools/build.py
+      - name: Require enabled publishing and SVN credentials
+        if: steps.preflight.outputs.publish == 'true' && !inputs.dry_run
+        env:
+          SVN_ENABLED: ${{ vars.WORDPRESS_SVN_ENABLED }}
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+        run: |
+          if [[ "$SVN_ENABLED" != 'true' || -z "$SVN_USERNAME" || -z "$SVN_PASSWORD" ]]; then
+            echo 'Add SVN_USERNAME and SVN_PASSWORD secrets, then set WORDPRESS_SVN_ENABLED=true after directory approval.' >&2
+            exit 1
+          fi
+      - name: Publish runtime files to trunk and version tag
+        if: steps.preflight.outputs.publish == 'true'
+        uses: 10up/action-wordpress-plugin-deploy@54bd289b8525fd23a5c365ec369185f2966529c2 # 2.3.0
+        with:
+          dry-run: ${{ inputs.dry_run }}
+        env:
+          SLUG: frica-id-login
+          VERSION: ${{ steps.preflight.outputs.version }}
+          BUILD_DIR: release-source/frica-id-login
+          # Repository artwork is optional and separate from runtime assets/login.css.
+          ASSETS_DIR: release-source/.wordpress-org
+          SVN_USERNAME: ${{ inputs.dry_run && 'dry-run' || secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ inputs.dry_run && 'dry-run' || secrets.SVN_PASSWORD }}
+      - name: Verify committed SVN tag contents
+        if: steps.preflight.outputs.publish == 'true' && !inputs.dry_run
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          VALIDATED_SHA: ${{ inputs.validated_sha }}
+        run: |
+          python3 automation/tools/wordpress-svn.py \
+            --source release-source --tag "$RELEASE_TAG" \
+            --sha "$(git -C release-source rev-parse HEAD)" \
+            --validated-sha "$VALIDATED_SHA" > "$RUNNER_TEMP/svn-verification"
+          grep -qx 'publish=false' "$RUNNER_TEMP/svn-verification"
+      - name: Deployment summary
+        env:
+          VERSION: ${{ steps.preflight.outputs.version }}
+          PUBLISH: ${{ steps.preflight.outputs.publish }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          {
+            echo '### WordPress.org SVN'
+            echo "Version: $VERSION"
+            if [[ "$PUBLISH" == 'false' ]]; then
+              echo 'Already published with identical files; no commit made.'
+            elif [[ "$DRY_RUN" == 'true' ]]; then
+              echo 'Dry run completed; no SVN commit made.'
+            else
+              echo "Published trunk and tags/$VERSION in SVN."
+              echo 'WordPress.org may still require release confirmation in its Release Management dashboard.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
