@@ -108,7 +108,7 @@ The bundled `firebase/php-jwt` 7.2.1 is pinned to upstream commit `0501f5729b9e2
 
 After the compatibility matrix and Plugin Check pass, a push to `main` automatically publishes a GitHub release if that plugin version has no release yet. Existing releases are preserved: increment the plugin version, readme stable tag and changelog for a new release. Explicit version tags are supported too. Release notes come from [RELEASE_NOTES.md](RELEASE_NOTES.md).
 
-The plugin is distributed on GitHub. **A WordPress.org listing is not yet approved.** See [WORDPRESS_ORG.md](WORDPRESS_ORG.md) for submission and review steps. Automatic WordPress.org updates become available only after directory approval and publication; this plugin does not install a third-party updater.
+WordPress.org SVN publishing is available through **Publish to WordPress.org SVN** in GitHub Actions. It supports a manual dry run and, once enabled, deploys tested GitHub releases to `trunk/` and matching SVN version tags. Configure `SVN_USERNAME`, `SVN_PASSWORD` and the `WORDPRESS_SVN_ENABLED=true` Actions variable after WordPress.org grants approval and committer access. See [WORDPRESS_ORG.md](WORDPRESS_ORG.md) for setup and first-publication instructions. Automatic WordPress.org updates become available only after directory approval and publication; this plugin does not install a third-party updater.
 
 ## Support and license
 
