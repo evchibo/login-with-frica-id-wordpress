@@ -37,7 +37,7 @@ complete OAuth round trip.
 5. When ready to publish, add the repository **Actions variable**
    `WORDPRESS_SVN_ENABLED` with value `true` in
    [Actions variables](https://github.com/evchibo/login-with-frica-id-wordpress/settings/variables/actions).
-   Leave it unset or set it to `false` to stop automatic publishing.
+   Leave it unset or set it to `false` to run automatic dry runs without publishing.
 
 The workflow uses a commit-pinned 10up deployment action with read-only GitHub
 permissions. SVN secrets are passed only to credential validation and the live
@@ -69,7 +69,8 @@ or push the matching stable `vX.Y.Z` tag.
 
 The existing WordPress compatibility matrix, integration tests and strict Plugin
 Check run first. The release job publishes the GitHub ZIP and then calls the SVN
-workflow directly when `WORDPRESS_SVN_ENABLED=true`. This does not depend on a
+workflow directly. It previews changes unless `WORDPRESS_SVN_ENABLED=true`, which
+enables live publication. This does not depend on a
 second release event, which a GitHub-token-created release would not trigger.
 
 The SVN workflow checks out the release tag, requires its commit to be on main's
